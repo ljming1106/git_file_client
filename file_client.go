@@ -15,27 +15,19 @@ const Udp = "udp"
 
 var waitGroup = sync.WaitGroup{}
 
-func main() {
-	accessWay := [...]string{Http, Tcp, Udp}
-	for _, Type := range accessWay {
-		switch Type {
-		case Http:
-			go httpAccess()
-		case Tcp:
-			go tcpAccess()
-		case Udp:
-			go udpAccess()
-		}
-	}
-	waitGroup.Add(3)
-	waitGroup.Wait()
+type httpWay string
+type tcpWay string
+type udpWay string
+
+type netAccess interface {
+	access()
 }
 
-func httpAccess() {
+/*HTTP*/
+func (httpDo httpWay) access() {
 	resp, _ := doGet("http://127.0.0.1:8000")
 	defer resp.Body.Close()
 	defer waitGroup.Done()
-	fmt.Println("http code", resp.StatusCode)
 	if resp.StatusCode == http.StatusOK {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
@@ -45,7 +37,6 @@ func httpAccess() {
 		fmt.Println("http reply", string(body))
 	}
 }
-
 func doGet(url string) (r *http.Response, e error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -55,7 +46,8 @@ func doGet(url string) (r *http.Response, e error) {
 	return resp, err
 }
 
-func tcpAccess() {
+/*TCP*/
+func (tcpDo tcpWay) access() {
 	conn, err := net.Dial("tcp", "127.0.0.1:8001")
 	if err != nil {
 		log.Panicln(err)
@@ -67,7 +59,8 @@ func tcpAccess() {
 	fmt.Println("tcp reply:", string(buffer))
 }
 
-func udpAccess() {
+/*UDP*/
+func (udpDo udpWay) access() {
 	conn, err := net.Dial("udp", "127.0.0.1:8002")
 	if err != nil {
 		log.Panicln(err)
@@ -83,4 +76,16 @@ func udpAccess() {
 	buffer := make([]byte, 1024)
 	conn.Read(buffer)
 	fmt.Println("udp reply", string(buffer))
+}
+
+func main() {
+	var httpDo httpWay = Http
+	var tcpDo tcpWay = Tcp
+	var udpDo udpWay = Udp
+	accessWay := [...]netAccess{httpDo, tcpDo, udpDo}
+	for _, Type := range accessWay {
+		go Type.access()
+	}
+	waitGroup.Add(3)
+	waitGroup.Wait()
 }
